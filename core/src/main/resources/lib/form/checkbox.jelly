@@ -51,14 +51,28 @@ THE SOFTWARE.
       If specified, this human readable text will follow the checkbox, and clicking this text also
       toggles the checkbox.
     </st:attribute>
+    <st:attribute name="disabled" type="boolean" />
   </st:documentation>
   <f:prepareDatabinding />
-  <input type="checkbox"
-         name="${attrs.name?:'_.'+attrs.field}"
-         value="${attrs.value}"
-         onclick="${attrs.onclick}" id="${attrs.id}" class="${attrs.negative!=null ? 'negative' : null} ${attrs.checkUrl!=null?'validated':''}"
-         checkUrl="${attrs.checkUrl}" json="${attrs.json}"
-         checked="${(attrs.checked ?: instance[attrs.field] ?: attrs.default) ? 'true' : null}"/>
+  <j:choose>
+    <j:when test="${attrs.disabled}">
+      <input type="checkbox"
+             name="${attrs.name?:'_.'+attrs.field}"
+             value="${attrs.value}"
+             onclick="${attrs.onclick}" id="${attrs.id}" class="${attrs.negative!=null ? 'negative' : null} ${attrs.checkUrl!=null?'validated':''}"
+             checkUrl="${attrs.checkUrl}" json="${attrs.json}"
+             checked="${(attrs.checked ?: instance[attrs.field] ?: attrs.default) ? 'true' : null}"
+             disabled="true"/>
+    </j:when>
+    <j:otherwise>
+      <input type="checkbox"
+             name="${attrs.name?:'_.'+attrs.field}"
+             value="${attrs.value}"
+             onclick="${attrs.onclick}" id="${attrs.id}" class="${attrs.negative!=null ? 'negative' : null} ${attrs.checkUrl!=null?'validated':''}"
+             checkUrl="${attrs.checkUrl}" json="${attrs.json}"
+             checked="${(attrs.checked ?: instance[attrs.field] ?: attrs.default) ? 'true' : null}"/>
+    </j:otherwise>
+  </j:choose>
   <j:if test="${attrs.title!=null}">
     <label class="attach-previous">${attrs.title}</label>
   </j:if>

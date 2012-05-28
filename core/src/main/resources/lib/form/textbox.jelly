@@ -70,6 +70,7 @@ THE SOFTWARE.
       selection. With this attribute set, the selection will be appended with the
       delimiter to the existing value of the text box.
     </st:attribute>
+    <st:attribute name="disabled" type="boolean"/>
   </st:documentation>
   <f:prepareDatabinding />
   ${descriptor.calcAutoCompleteSettings(autoCompleteField?:field,attrs)} <!-- this figures out the 'autoCompleteUrl' attribute -->
@@ -80,5 +81,5 @@ THE SOFTWARE.
          name="${attrs.name ?: '_.'+attrs.field}"
          value="${attrs.value ?: instance[attrs.field] ?: attrs.default}"
          type="text"
-         ATTRIBUTES="${attrs}" EXCEPT="field clazz" />
+         ATTRIBUTES="${attrs}" EXCEPT="field clazz ${attrs.disabled?'':'disabled'}"/>
 </j:jelly>
