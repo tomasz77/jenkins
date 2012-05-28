@@ -34,6 +34,9 @@ THE SOFTWARE.
     <st:attribute name="name">
       Optional attribute to create a JSON object from this section.
     </st:attribute>
+    <st:attribute name="disabled" type="boolean">
+      If true, body will be covered by 50% opacity block and will be not editable.
+    </st:attribute>
   </st:documentation>
 
   <st:adjunct includes="lib.form.section_" />
@@ -45,6 +48,23 @@ THE SOFTWARE.
         </div>
       </f:block>
     </j:if>
-    <d:invokeBody />
+    <j:choose>
+      <j:when test="${attrs.disabled}">
+        <tbody>
+          <tr class="disabled-section"></tr>
+          <d:invokeBody />
+        </tbody>
+      </j:when>
+      <j:otherwise>
+        <d:invokeBody />
+      </j:otherwise>
+    </j:choose>
   </f:rowSet>
+  <j:if test="${attrs.disabled}">
+    <script>
+      Behaviour.addLoadEvent(function() {
+        $$("tr.disabled-section").each(function(t) { t.setStyle({height: t.up().getHeight()+"px", width: t.up().getWidth()+"px"}) });
+      });
+    </script>
+  </j:if>
 </j:jelly>

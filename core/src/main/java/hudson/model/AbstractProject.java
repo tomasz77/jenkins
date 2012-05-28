@@ -1864,10 +1864,12 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
             scmCheckoutStrategy = null;
 
         
-        if(req.getParameter("hasSlaveAffinity")!=null) {
-            assignedNode = Util.fixEmptyAndTrim(req.getParameter("_.assignedLabelString"));
-        } else {
-            assignedNode = null;
+		if (hasPermission(CONFIGURE_WHERE_RUN)) {
+            if(req.getParameter("hasSlaveAffinity")!=null) {
+                assignedNode = Util.fixEmptyAndTrim(req.getParameter("_.assignedLabelString"));
+            } else {
+                assignedNode = null;
+            }
         }
         canRoam = assignedNode==null;
 
@@ -1875,7 +1877,8 @@ public abstract class AbstractProject<P extends AbstractProject<P,R>,R extends A
 
         authToken = BuildAuthorizationToken.create(req);
 
-        setScm(SCMS.parseSCM(req,this));
+        if (hasPermission(CONFIGURE_SCM))
+            setScm(SCMS.parseSCM(req,this));
 
         for (Trigger t : triggers())
             t.stop();

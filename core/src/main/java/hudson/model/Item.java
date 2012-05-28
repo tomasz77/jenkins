@@ -223,6 +223,10 @@ public interface Item extends PersistenceRoot, SearchableModelObject, AccessCont
     Permission CREATE = new Permission(PERMISSIONS, "Create", null, Permission.CREATE, PermissionScope.ITEM_GROUP);
     Permission DELETE = new Permission(PERMISSIONS, "Delete", null, Permission.DELETE, PermissionScope.ITEM);
     Permission CONFIGURE = new Permission(PERMISSIONS, "Configure", null, Permission.CONFIGURE, PermissionScope.ITEM);
+    Permission CONFIGURE_SECURITY = new Permission(PERMISSIONS, "Configure_Security", Messages._AbstractProject_ConfigureSecurityPermission_Description(), Permission.CONFIGURE, PermissionScope.ITEM);
+    Permission CONFIGURE_WHERE_RUN = new Permission(PERMISSIONS, "Configure_WhereRun", Messages._AbstractProject_ConfigureWhereRunPermission_Description(), Permission.CONFIGURE, PermissionScope.ITEM);
+    Permission CONFIGURE_SCM = new Permission(PERMISSIONS, "Configure_SCM", Messages._AbstractProject_ConfigureSourceCodeManagementPermission_Description(), Permission.CONFIGURE, PermissionScope.ITEM);
+    Permission CONFIGURE_BUILD = new Permission(PERMISSIONS, "Configure_Build", Messages._AbstractProject_ConfigureBuildPermission_Description(), Permission.CONFIGURE, PermissionScope.ITEM);
     Permission READ = new Permission(PERMISSIONS, "Read", null, Permission.READ, PermissionScope.ITEM);
     Permission DISCOVER = new Permission(PERMISSIONS, "Discover", Messages._AbstractProject_DiscoverPermission_Description(), Permission.READ, PermissionScope.ITEM);
     Permission EXTENDED_READ = new Permission(PERMISSIONS,"ExtendedRead", Messages._AbstractProject_ExtendedReadPermission_Description(), CONFIGURE, Boolean.getBoolean("hudson.security.ExtendedReadPermission"), new PermissionScope[]{PermissionScope.ITEM});

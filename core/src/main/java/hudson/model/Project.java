@@ -197,7 +197,8 @@ public abstract class Project<P extends Project<P,B>,B extends Build<P,B>>
         JSONObject json = req.getSubmittedForm();
 
         getBuildWrappersList().rebuild(req,json, BuildWrappers.getFor(this));
-        getBuildersList().rebuildHetero(req,json, Builder.all(), "builder");
+        if (hasPermission(CONFIGURE_BUILD))
+            getBuildersList().rebuildHetero(req,json, Builder.all(), "builder");
         getPublishersList().rebuildHetero(req, json, Publisher.all(), "publisher");
     }
 

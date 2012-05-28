@@ -43,6 +43,7 @@ import hudson.search.SearchIndexBuilder;
 import hudson.search.SearchItem;
 import hudson.search.SearchItems;
 import hudson.security.ACL;
+import hudson.security.AuthorizationMatrixProperty;
 import hudson.tasks.LogRotator;
 import hudson.util.AlternativeUiTextProvider;
 import hudson.util.ChartUtil;
@@ -1037,6 +1038,14 @@ public abstract class Job<JobT extends Job<JobT, RunT>, RunT extends Run<JobT, R
 
             DescribableList<JobProperty<?>, JobPropertyDescriptor> t = new DescribableList<JobProperty<?>, JobPropertyDescriptor>(NOOP,getAllProperties());
             t.rebuild(req,json.optJSONObject("properties"),JobPropertyDescriptor.getPropertyDescriptors(Job.this.getClass()));
+            if (!hasPermission(CONFIGURE_SECURITY)) {
+                for (JobProperty<?> p : properties) {
+                    if (p.getClass().equals(AuthorizationMatrixProperty.class)) {
+                        t.replace(p);
+                        break;
+                    }
+                }
+            }
             properties.clear();
             for (JobProperty p : t) {
                 p.setOwner(this);
