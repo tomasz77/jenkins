@@ -84,6 +84,21 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
     }
 
     /**
+     * Hacked method for workaround not visible Nested View issue
+     * @param item
+     * @return
+     */
+    private boolean isViewVisible(View item) {
+        if (item.getClass().toString().equals("class hudson.plugins.nested_view.NestedView")) {
+            try {
+                return !((Collection<View>)item.getClass().getMethod("getViews", new Class[0]).invoke(item)).isEmpty();
+            } catch(Exception e) {
+            }
+        }
+        return !item.getItems().isEmpty();
+    }
+
+    /**
      * Implementation can choose to provide different ACL for different views.
      * This can be used as a basis for more fine-grained access control.
      *
@@ -101,7 +116,7 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
 
                 boolean hasPermission = base.hasPermission(a, permission);
                 if (!hasPermission && permission == View.READ) {
-                    return base.hasPermission(a,View.CONFIGURE) || !item.getItems().isEmpty();
+                    return base.hasPermission(a,View.CONFIGURE) || isViewVisible(item);
                 }
 
                 return hasPermission;
