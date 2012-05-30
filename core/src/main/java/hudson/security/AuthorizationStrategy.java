@@ -91,7 +91,12 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
     private boolean isViewVisible(View item) {
         if (item.getClass().toString().equals("class hudson.plugins.nested_view.NestedView")) {
             try {
-                return !((Collection<View>)item.getClass().getMethod("getViews", new Class[0]).invoke(item)).isEmpty();
+                Collection<View> views = (Collection<View>)item.getClass().getMethod("getViews", new Class[0]).invoke(item);
+                for (View view : views) {
+                    if (isViewVisible(view))
+                        return true;
+                }
+                return false;
             } catch(Exception e) {
             }
         }
