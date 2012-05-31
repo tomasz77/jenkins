@@ -892,6 +892,10 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
         return activities;
     }
 
+    public String getRootPOM() {
+        return getRootPOM(null);
+    }
+
     /**
      * @deprecated for backward comp only
      */
