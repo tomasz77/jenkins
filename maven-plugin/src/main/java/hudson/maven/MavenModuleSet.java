@@ -807,6 +807,10 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
         return activities;
     }
 
+    public String getRootPOM() {
+        return getRootPOM(null);
+    }
+
     /**
      * Gets the location of top-level <tt>pom.xml</tt> relative to the workspace root.
      */
