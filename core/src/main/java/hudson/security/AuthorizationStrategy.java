@@ -99,6 +99,12 @@ public abstract class AuthorizationStrategy extends AbstractDescribableImpl<Auth
                 return false;
             } catch(Exception e) {
             }
+        } else if (item.getClass().toString().equals("class au.com.centrumsystems.hudson.plugin.buildpipeline.BuildPipelineView")) {
+            try {
+                AbstractProject<?, ?> project = (AbstractProject<?, ?>)item.getClass().getMethod("getSelectedProject", new Class[0]).invoke(item);
+                return project != null;
+            } catch(Exception e) {
+            }
         }
         return !item.getItems().isEmpty();
     }
