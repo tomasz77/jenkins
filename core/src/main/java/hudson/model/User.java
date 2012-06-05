@@ -68,11 +68,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.CheckForNull;
+
+import java.util.LinkedList;import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 /**
@@ -108,6 +110,8 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
 
     private volatile String description;
 
+    private volatile String aliases;
+
     /**
      * List of {@link UserProperty}s configured for this project.
      */
@@ -118,6 +122,7 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
     private User(String id, String fullName) {
         this.id = id;
         this.fullName = fullName;
+        this.aliases = "";
         load();
     }
 
@@ -343,6 +348,8 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
             User prev = byName.putIfAbsent(idkey, u = tmp);
             if (prev!=null)
                 u = prev;   // if some has already put a value in the map, use it
+            else
+                u.updateAliases("");
         }
         return u;
     }
@@ -461,6 +468,10 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         return new XmlFile(XSTREAM,getConfigFileFor(id));
     }
 
+    public boolean isRealAdminister() {
+        return Jenkins.getInstance().getAuthorizationStrategy().getACL(this).hasPermission(Jenkins.ADMINISTER);
+    }
+
     private static final File getConfigFileFor(String id) {
         return new File(getRootDir(),id +"/config.xml");
     }
@@ -499,6 +510,19 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         return new Api(this);
     }
 
+    private void updateAliases(String oldAliases) {
+        List<String> oldAliasesList = Arrays.asList(oldAliases.split(";"));
+        List<String> newAliasesList = Arrays.asList(aliases.split(";"));
+        List<String> removedAliases = new LinkedList<String>(oldAliasesList);
+        removedAliases.removeAll(newAliasesList);
+        List<String> addedAliases = new LinkedList<String>(newAliasesList);
+        addedAliases.removeAll(oldAliasesList);
+        for (String alias : removedAliases)
+            byName.remove(alias.toLowerCase(Locale.ENGLISH));
+        for (String alias : addedAliases)
+            byName.put(alias.toLowerCase(Locale.ENGLISH), this);
+    }
+
     /**
      * Accepts submission from the configuration page.
      */
@@ -508,7 +532,11 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
 
         fullName = req.getParameter("fullName");
         description = req.getParameter("description");
-
+        if (isRealAdminister()) {
+            String oldAliases = aliases;
+            aliases = req.getParameter("aliases");
+            updateAliases(oldAliases);
+        }
         JSONObject json = req.getSubmittedForm();
 
         List<UserProperty> props = new ArrayList<UserProperty>();

@@ -37,7 +37,10 @@ THE SOFTWARE.
         <f:entry title="${%Description}" help="/help/user/description.html">
           <f:textarea name="description" value="${it.description}"/>
         </f:entry>
-
+        <f:entry title="${%Aliases}" help="/help/user/aliases.html">
+          <f:textbox name="aliases" value="${it.aliases}" disabled="${!it.isRealAdminister()}"/>
+        </f:entry>
+        <!-- TODO: dodać tutaj aliasy -->
         <!-- user property configurations -->
         <j:invokeStatic var="descriptors" className="hudson.model.UserProperty" method="all" />
         <j:set var="instances" value="${it.properties}" />
