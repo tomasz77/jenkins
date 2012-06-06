@@ -34,11 +34,11 @@ import hudson.security.AccessControlled;
 import hudson.security.Permission;
 import hudson.security.SecurityRealm;
 import hudson.util.FormApply;
+import hudson.util.FormValidation;
 import hudson.util.RunList;
 import hudson.util.XStream2;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
-
 import org.acegisecurity.Authentication;
 import org.acegisecurity.GrantedAuthority;
 import org.acegisecurity.providers.UsernamePasswordAuthenticationToken;
@@ -46,31 +46,23 @@ import org.acegisecurity.providers.anonymous.AnonymousAuthenticationToken;
 import org.acegisecurity.userdetails.UserDetails;
 import org.acegisecurity.userdetails.UsernameNotFoundException;
 import org.springframework.dao.DataAccessException;
+import org.apache.commons.io.filefilter.DirectoryFileFilter;
+import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
-import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.IOException;
 import java.io.FileFilter;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.Arrays;
+import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -167,6 +159,10 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
     @Exported
     public String getId() {
         return id;
+    }
+
+    public String getAliases() {
+        return aliases;
     }
 
     public String getUrl() {
@@ -398,7 +394,7 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
             lastScanned = System.currentTimeMillis();
         }
 
-        ArrayList<User> r = new ArrayList<User>(byName.values());
+        ArrayList<User> r = new ArrayList<User>(new HashSet<User>(byName.values()));
         Collections.sort(r,new Comparator<User>() {
             public int compare(User o1, User o2) {
                 return o1.getId().compareToIgnoreCase(o2.getId());
@@ -510,17 +506,44 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         return new Api(this);
     }
 
-    private void updateAliases(String oldAliases) {
+    private boolean updateAliases(String oldAliases) {
         List<String> oldAliasesList = Arrays.asList(oldAliases.split(";"));
         List<String> newAliasesList = Arrays.asList(aliases.split(";"));
         List<String> removedAliases = new LinkedList<String>(oldAliasesList);
         removedAliases.removeAll(newAliasesList);
         List<String> addedAliases = new LinkedList<String>(newAliasesList);
         addedAliases.removeAll(oldAliasesList);
+        if (!getDuplicateAliases(addedAliases).isEmpty())
+            return false;
         for (String alias : removedAliases)
             byName.remove(alias.toLowerCase(Locale.ENGLISH));
         for (String alias : addedAliases)
             byName.put(alias.toLowerCase(Locale.ENGLISH), this);
+        return true;
+    }
+
+    private List<String> getDuplicateAliases(List<String> aliases) {
+        List<String> list = new LinkedList<String>();
+        for (String alias : aliases)
+            if (byName.get(alias) != null && !alias.equals(byName.get(alias).getId()))
+                list.add(alias);
+        return list;
+    }
+
+    public FormValidation doAliasCheck(@QueryParameter String value) {
+        if (!isRealAdminister())
+            return FormValidation.error("No permission");
+        User.getAll();
+        List<String> addedAliases = new ArrayList(Arrays.asList(value.split(";")));
+        addedAliases.removeAll(Arrays.asList(aliases.split(";")));
+        List<String> duplicates = getDuplicateAliases(addedAliases);
+        if (duplicates.isEmpty())
+            return FormValidation.ok();
+        StringBuffer buffer = new StringBuffer("Aliases already used: ");
+        for (String alias : duplicates) {
+            buffer.append(alias).append(" ");
+        }
+        return FormValidation.error(buffer.toString());
     }
 
     /**
@@ -535,7 +558,9 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         if (isRealAdminister()) {
             String oldAliases = aliases;
             aliases = req.getParameter("aliases");
-            updateAliases(oldAliases);
+            User.getAll();
+            if (!updateAliases(oldAliases))
+                aliases = oldAliases;
         }
         JSONObject json = req.getSubmittedForm();
 
