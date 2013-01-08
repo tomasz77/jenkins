@@ -38,6 +38,9 @@ THE SOFTWARE.
       <j:if test="${it.canDelete()}">
         <l:task icon="images/24x24/edit-delete.png" href="${rootURL}/${it.url}/delete" title="${%Delete}" />
       </j:if>
+      <j:if test="${it.isRealAdminister()}">
+        <l:task icon="images/24x24/merge.png" href="${rootURL}/${it.url}/merge" title="${%Merge}" />
+      </j:if>
       <!--  TODO add all UserProperties that are also actions -->
     </l:tasks>
   </l:side-panel>

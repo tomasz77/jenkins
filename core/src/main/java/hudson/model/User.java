@@ -28,10 +28,8 @@ import com.thoughtworks.xstream.XStream;
 import hudson.*;
 import hudson.model.Descriptor.FormException;
 import hudson.model.listeners.SaveableListener;
-import hudson.security.ACL;
-import hudson.security.AccessControlled;
-import hudson.security.Permission;
-import hudson.security.SecurityRealm;
+import hudson.security.*;
+import hudson.tasks.Mailer;
 import hudson.util.FormValidation;
 import hudson.util.RunList;
 import hudson.util.XStream2;
@@ -56,6 +54,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -97,6 +96,8 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
     private volatile String description;
 
     private volatile String aliases;
+
+    private transient final String aliasSeparator = ";";
 
     /**
      * List of {@link UserProperty}s configured for this project.
@@ -462,26 +463,29 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
     }
 
     private boolean updateAliases(String oldAliases) {
-        List<String> oldAliasesList = Arrays.asList(oldAliases.split(";"));
-        List<String> newAliasesList = Arrays.asList(aliases.split(";"));
+        List<String> oldAliasesList = Arrays.asList(oldAliases.toLowerCase(Locale.ENGLISH).split(aliasSeparator));
+        List<String> newAliasesList = Arrays.asList(aliases.toLowerCase(Locale.ENGLISH).split(aliasSeparator));
         List<String> removedAliases = new LinkedList<String>(oldAliasesList);
         removedAliases.removeAll(newAliasesList);
         List<String> addedAliases = new LinkedList<String>(newAliasesList);
         addedAliases.removeAll(oldAliasesList);
         if (!getDuplicateAliases(addedAliases).isEmpty())
             return false;
-        for (String alias : removedAliases)
-            byName.remove(alias.toLowerCase(Locale.ENGLISH));
+        for (String alias : removedAliases) {
+            byName.remove(alias);
+            User.get(alias, false);
+        }
         for (String alias : addedAliases)
-            byName.put(alias.toLowerCase(Locale.ENGLISH), this);
+            byName.put(alias, this);
         return true;
     }
 
     private List<String> getDuplicateAliases(List<String> aliases) {
         List<String> list = new LinkedList<String>();
-        for (String alias : aliases)
+        for (String alias : aliases) {
             if (byName.get(alias) != null && !alias.equals(byName.get(alias).getId()))
                 list.add(alias);
+        }
         return list;
     }
 
@@ -489,8 +493,9 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         if (!isRealAdminister())
             return FormValidation.error("No permission");
         User.getAll();
-        List<String> addedAliases = new ArrayList(Arrays.asList(value.split(";")));
-        addedAliases.removeAll(Arrays.asList(aliases.split(";")));
+        List<String> addedAliases = new ArrayList(Arrays.asList(value.toLowerCase(Locale.ENGLISH).split(aliasSeparator)));
+        addedAliases.remove("");
+        addedAliases.removeAll(Arrays.asList(aliases.toLowerCase(Locale.ENGLISH).split(aliasSeparator)));
         List<String> duplicates = getDuplicateAliases(addedAliases);
         if (duplicates.isEmpty())
             return FormValidation.ok();
@@ -501,9 +506,106 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         return FormValidation.error(buffer.toString());
     }
 
+    public boolean userToMergeCheck(String user, String userToMerge) {
+        return doUserToMergeCheck(user, userToMerge).kind.equals(FormValidation.Kind.OK);
+    }
+
+    public FormValidation doUserToMergeCheck(@QueryParameter String user, @QueryParameter String value) {
+        if ("".equals(value))
+            return FormValidation.warning("Specify user id");
+        if (user.equals(value))
+            return FormValidation.error("Cannot merge user with itself");
+        String valueLower = value.toLowerCase(Locale.ENGLISH);
+        if (User.get(valueLower, false) == null)
+            return FormValidation.error("User does not exist");
+        if (!valueLower.equals(User.get(valueLower).getId().toLowerCase(Locale.ENGLISH)))
+            return FormValidation.error("Specified user is already an alias");
+        return FormValidation.ok();
+    }
+
+    public User getMergedUser(String username) {
+        User mergedUser = new User(this.id, this.fullName);
+        String usernameLower = username.toLowerCase(Locale.ENGLISH);
+        mergedUser.aliases += aliasSeparator+usernameLower;
+        User other = User.get(usernameLower);
+
+        // Normal merging user property from jenkins core
+        Mailer.UserProperty mailerProp = mergedUser.getProperty(Mailer.UserProperty.class);
+        if (mailerProp != null && (mailerProp.getAddress() == null || "".equals(mailerProp.getAddress()))) {
+            Mailer.UserProperty mergedMailerProp = other.getProperty(Mailer.UserProperty.class);
+            if (mergedMailerProp != null && mergedMailerProp.getAddress() != null && !"".equals(mergedMailerProp.getAddress())) {
+                int index = mergedUser.properties.indexOf(mailerProp);
+                mergedUser.properties.remove(mailerProp);
+                mergedUser.properties.add(index, new Mailer.UserProperty(mergedMailerProp.getAddress()));
+            }
+        }
+
+        // Hacked merging for plugin user properties
+        for (UserProperty property : mergedUser.properties) {
+            if ("class pl.outbox.optipos.teamGame.model.Properties.UserTeamProperty".equals(property.getClass().toString())) {
+                try {
+                    UserProperty otherProperty = other.getProperty(property.getClass());
+                    if (otherProperty == null)
+                        continue;
+                    Method getTeamName = property.getClass().getMethod("getTeamName");
+                    Method setTeamName = property.getClass().getMethod("setTeamName", String.class);
+                    String teamName = (String)getTeamName.invoke(property);
+                    String otherTeamName = (String)getTeamName.invoke(otherProperty);
+                    if (teamName == null || "".equals(teamName) || "(no team)".equals(teamName)) {
+                        setTeamName.invoke(property, otherTeamName);
+                    }
+                } catch (Exception e) {
+
+                }
+            } else if ("class hudson.plugins.cigame.UserScoreProperty".equals(property.getClass().toString())) {
+                try {
+                    UserProperty otherProperty = other.getProperty(property.getClass());
+                    if (otherProperty == null)
+                        continue;
+                    Method getScore = property.getClass().getMethod("getScore");
+                    Method setScore = property.getClass().getMethod("setScore", double.class);
+                    double score = (Double)getScore.invoke(property) + (Double)getScore.invoke(otherProperty);
+                    setScore.invoke(property, score);
+                } catch (Exception e) {
+
+                }
+            }
+        }
+
+        // for properties which can be not present in base user
+        for (UserProperty otherProperty : other.properties) {
+            if ("class hudson.plugins.cigame.UserScoreProperty".equals(otherProperty.getClass().toString())) {
+                try {
+                    UserProperty property = mergedUser.getProperty(otherProperty.getClass());
+                    if (property != null)
+                        continue;
+                    Method getScore = otherProperty.getClass().getMethod("getScore");
+                    Method isParticipatingInGame = otherProperty.getClass().getMethod("isParticipatingInGame");
+                    mergedUser.addProperty(otherProperty.getClass().getConstructor(double.class, boolean.class)
+                            .newInstance(getScore.invoke(otherProperty), isParticipatingInGame.invoke(otherProperty)));
+                } catch (Exception e) {
+
+                }
+            }
+        }
+
+        return mergedUser;
+    }
+
+    @RequirePOST
+    public void doMergeSubmit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, FormException {
+        if (!isRealAdminister())
+            throw new AccessDeniedException2(Jenkins.getAuthentication(), Jenkins.ADMINISTER);
+        String otherUser = req.getParameter("merged_user");
+        if (otherUser == null || !userToMergeCheck(getId(), otherUser))
+            throw new FormException(doUserToMergeCheck(getId(), otherUser).getMessage(), "merged_user");
+        doConfigSubmit(req, rsp);
+    }
+
+
     /**
-     * Accepts submission from the configuration page.
-     */
+    * Accepts submission from the configuration page.
+    */
     @RequirePOST
     public void doConfigSubmit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, FormException {
         checkPermission(Jenkins.ADMINISTER);
@@ -511,8 +613,8 @@ public class User extends AbstractModelObject implements AccessControlled, Descr
         fullName = req.getParameter("fullName");
         description = req.getParameter("description");
         if (isRealAdminister()) {
-            String oldAliases = aliases;
-            aliases = req.getParameter("aliases");
+            String oldAliases = aliases.toLowerCase(Locale.ENGLISH);
+            aliases = req.getParameter("aliases").toLowerCase(Locale.ENGLISH);
             User.getAll();
             if (!updateAliases(oldAliases))
                 aliases = oldAliases;
