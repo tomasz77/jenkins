@@ -1,0 +1,84 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:i="jelly:fmt">
+  <l:layout norefresh="true">
+    <j:set var="username" value="${request.getParameter('username')}" />
+    <st:include page="sidepanel.jelly" />
+      <l:main-panel>
+          <j:choose>
+              <j:when test="${username == null || !it.userToMergeCheck(it.getId(), username)}">
+                  <f:form method="post" action="merge">
+                      <f:entry title="${%User to merge}">
+                          <f:textbox name="username" value="${username}" checkUrl="'userToMergeCheck?user=${it.getId()}&amp;value='+encodeURIComponent(this.value)"/>
+                      </f:entry>
+                      <f:block>
+                          <f:submit value="${%Merge}" />
+                      </f:block>
+                  </f:form>
+              </j:when>
+              <j:otherwise>
+                  <f:form>
+                      <f:section disabled="true">
+                          <f:entry title="${%Your name}" help="/help/user/fullName.html">
+                              <f:textbox name="fullName" value="${it.fullName}"/>
+                          </f:entry>
+                          <f:entry title="${%Description}" help="/help/user/description.html">
+                              <f:textarea name="description" value="${it.description}"/>
+                          </f:entry>
+                          <f:entry title="${%Aliases}" help="/help/user/aliases.html">
+                              <f:textbox name="aliases" value="${it.getAliases()}" disabled="${!it.isRealAdminister()}"/>
+                          </f:entry>
+                          <!-- user property configurations -->
+                          <j:invokeStatic var="descriptors" className="hudson.model.UserProperty" method="all" />
+                          <j:set var="instances" value="${it.properties}" />
+                          <j:forEach var="d" items="${descriptors}" varStatus="loop">
+                              <j:if test="${d.enabled}">
+                                  <f:section title="${d.displayName}">
+                                      <j:set var="descriptor" value="${d}" />
+                                      <j:set var="instance" value="${instances[d]}" />
+
+                                      <f:rowSet name="userProperty${loop.index}">
+                                          <st:include from="${d}" page="${d.configPage}"/>
+                                      </f:rowSet>
+                                  </f:section>
+                              </j:if>
+                          </j:forEach>
+                      </f:section>
+                  </f:form>
+                  <j:set var="it_merged" value="${it.getMergedUser(username)}" />
+                  <f:form method="post" action="mergeSubmit" name="config">
+                      <input type="hidden" name="merged_user" value="${username}"/>
+                      <f:section title="${%Merged with} ${username}"/>
+                      <f:entry title="${%Your name}" help="/help/user/fullName.html">
+                          <f:textbox name="fullName" value="${it_merged.fullName}"/>
+                      </f:entry>
+                      <f:entry title="${%Description}" help="/help/user/description.html">
+                          <f:textarea name="description" value="${it_merged.description}"/>
+                      </f:entry>
+                      <f:entry title="${%Aliases}" help="/help/user/aliases.html">
+                          <f:textbox name="aliases" value="${it_merged.getAliases()}" disabled="${!it_merged.isRealAdminister()}"/>
+                      </f:entry>
+                      <!-- user property configurations -->
+                      <j:invokeStatic var="descriptors" className="hudson.model.UserProperty" method="all" />
+                      <j:set var="instances" value="${it_merged.properties}" />
+                      <j:forEach var="d" items="${descriptors}" varStatus="loop">
+                          <j:if test="${d.enabled}">
+                              <f:section title="${d.displayName}">
+                                  <j:set var="descriptor" value="${d}" />
+                                  <j:set var="instance" value="${instances[d]}" />
+
+                                  <f:rowSet name="userProperty${loop.index}">
+                                      <st:include from="${d}" page="${d.configPage}"/>
+                                  </f:rowSet>
+                              </f:section>
+                          </j:if>
+                      </j:forEach>
+
+                    <f:block>
+                      <f:submit value="${%Save}" />
+                    </f:block>
+                  </f:form>
+              </j:otherwise>
+          </j:choose>
+      </l:main-panel>
+  </l:layout>
+</j:jelly>
